@@ -1,0 +1,24 @@
+{
+  "name": "developer-portfolio-backend",
+  "version": "1.0.0",
+  "description": "Build a developer portfolio platform with multiple microservices that showcase your skills while implementing modern development practices.",
+  "license": "ISC",
+  "author": "Mohamed Abdelazim",
+  "type": "commonjs",
+  "main": "app.js",
+  "scripts": {
+    "start": "nodemon app.js"
+  },
+  "dependencies": {
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.0.1",
+    "helmet": "^8.1.0",
+    "isomorphic-dompurify": "^2.26.0",
+    "nodemailer": "^7.0.5",
+    "nodemon": "^3.1.10",
+    "validator": "^13.15.15"
+  }
+}
