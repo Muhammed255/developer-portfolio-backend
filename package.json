@@ -7,7 +7,10 @@
   "type": "commonjs",
   "main": "app.js",
   "scripts": {
-    "start": "nodemon app.js"
+    "start": "nodemon api/app.js",
+    "build": "babel src -d lib",
+    "vercel-dev": "vercel dev",
+    "deploy": "vercel --prod"
   },
   "dependencies": {
     "compression": "^1.8.1",

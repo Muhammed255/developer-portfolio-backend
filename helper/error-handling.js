@@ -34,6 +34,11 @@ function errorHandler(error, req, res, next) {
     statusCode = 400;
     message = 'Validation error';
   }
+
+  console.log("HEHEHREHHRHEH",{
+    error: message,
+    ...(isDevelopment && { stack: error.stack })
+  })
   
   res.status(statusCode).json({
     error: message,
