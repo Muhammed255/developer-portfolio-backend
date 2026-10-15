@@ -1,63 +1,42 @@
 const { createTransport } = require("nodemailer");
-require("dotenv/config");
+const { getMailConfig } = require("./mail-config");
 
-// Email configuration with better error handling
-const createEmailTransporter = () => {
-  const requiredEnvVars = ['MAIL_LOGIN_USER', 'MAIL_LOGIN_PASS'];
-  const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
-  
-  if (missingVars.length > 0) {
-    throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+// Reused while a serverless instance is warm; rebuilt if the settings change
+// (e.g. after the credentials in Secrets Manager are rotated).
+let transporter;
+let transporterKey;
+
+const getTransporter = (config) => {
+  const key = [config.host, config.port, config.user, config.pass].join("|");
+  if (!transporter || transporterKey !== key) {
+    transporter = createTransport({
+      host: config.host,
+      port: config.port,
+      secure: config.port === 465,
+      auth: { user: config.user, pass: config.pass },
+      connectionTimeout: 10000,
+      socketTimeout: 10000,
+    });
+    transporterKey = key;
   }
-
-  return createTransport({
-    host: "smtp-relay.brevo.com",
-    port: 465,
-    secure: true,
-    auth: {
-      user: process.env.MAIL_LOGIN_USER,
-      pass: process.env.MAIL_LOGIN_PASS,
-    },
-    // Connection timeout
-    connectionTimeout: 10000,
-    // Socket timeout
-    socketTimeout: 10000,
-    // Pool settings for better performance
-    pool: true,
-    maxConnections: 5,
-    maxMessages: 10,
-  });
+  return transporter;
 };
 
-const sendMail = async (from, subject, text, name) => {
-  const transporter = createEmailTransporter();
-  
-  // Validate environment variables
-  const recipients = process.env.MAIL_TO 
-    ? process.env.MAIL_TO.split(',').map(email => email.trim())
-    : ["mhmd.ahmd.0597@gmail.com", "mohmed2011515616@gmail.com"];
-
-  const mailOptions = {
-    from: `"Contact Form" <${process.env.MAIL_LOGIN_USER}>`, // Use authenticated sender
-    replyTo: `"${name}" <${from}>`, // Set reply-to as the actual sender
-    to: recipients,
-    subject: `[Contact Form] ${subject}`,
-    text: text,
-    html: htmlTemplate(name, subject, from, text),
-    // Add message ID for tracking
-    messageId: `${Date.now()}.${Math.random().toString(36).substr(2, 9)}@yourdomain.com`
-  };
+const sendMail = async ({ from, subject, body, name }) => {
+  const config = await getMailConfig();
+  const mailer = getTransporter(config);
 
   try {
-    const result = await transporter.sendMail(mailOptions);
-    console.log('Email sent successfully:', result.messageId);
-    return result;
+    return await mailer.sendMail({
+      from: { name: "Contact Form", address: config.from }, // verified sender
+      replyTo: { name, address: from }, // object form: nodemailer encodes it safely
+      to: config.to,
+      subject: `[Contact Form] ${subject}`,
+      text: body,
+      html: htmlTemplate(name, subject, from, body),
+    });
   } catch (error) {
-    console.error('Failed to send email:', error);
-    throw new Error('Email delivery failed');
-  } finally {
-    // Close the transporter
-    transporter.close();
+    throw new Error(`Email delivery failed: ${error.code || error.message}`);
   }
 };
 

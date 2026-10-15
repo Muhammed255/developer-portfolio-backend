@@ -1,0 +1,15 @@
+version = 0.1
+
+[default.global.parameters]
+stack_name = "portfolio-contact-api"
+
+[default.build.parameters]
+cached = true
+
+[default.deploy.parameters]
+region = "eu-central-1"
+capabilities = "CAPABILITY_IAM"
+resolve_s3 = true
+confirm_changeset = true
+fail_on_empty_changeset = false
+parameter_overrides = "CorsOrigins=\"https://mohamed-abdelazim.netlify.app\" MailSecretName=\"portfolio/contact-mail\""
