@@ -47,3 +47,6 @@ coverage/
 .idea/
 *.swp
 *.swo
+# AWS SAM
+.aws-sam/
+samconfig.local.toml

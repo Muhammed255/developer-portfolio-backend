@@ -1,0 +1,91 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  IAM role that GitHub Actions assumes through OIDC to deploy the portfolio
+  stacks (no long-lived AWS keys in GitHub). Deploy once, by hand.
+
+Parameters:
+  GitHubOwner:
+    Type: String
+    Default: Muhammed255
+  CreateOidcProvider:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "true"
+    Description: Set to false if the account already has the token.actions.githubusercontent.com provider
+
+Conditions:
+  CreateProvider: !Equals [!Ref CreateOidcProvider, "true"]
+
+Resources:
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: CreateProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+
+  DeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: portfolio-github-deploy
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              # Deploy jobs run in the "production" GitHub environment, so the
+              # token subject is "...:environment:production", not the branch.
+              # The workflows only use that environment on main/master pushes.
+              StringLike:
+                token.actions.githubusercontent.com:sub:
+                  - !Sub repo:${GitHubOwner}/developer-portfolio-backend:environment:production
+                  - !Sub repo:${GitHubOwner}/developer-portfolio:environment:production
+      # Broad enough for SAM/CloudFormation to manage the two portfolio
+      # stacks. Tighten further once the stacks are stable.
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSCloudFormationFullAccess
+      Policies:
+        - PolicyName: portfolio-deploy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:*
+                  - apigateway:*
+                  - dynamodb:*
+                  - logs:*
+                  - cloudwatch:*
+                  - sns:*
+                  - s3:*
+                  - cloudfront:*
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - iam:GetRole
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:PassRole
+                  - iam:TagRole
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:GetRolePolicy
+                  - iam:UntagRole
+                  - iam:ListRoleTags
+                  - iam:UpdateAssumeRolePolicy
+                Resource: !Sub arn:aws:iam::${AWS::AccountId}:role/portfolio-*
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Sub arn:aws:secretsmanager:*:${AWS::AccountId}:secret:portfolio/*
+
+Outputs:
+  RoleArn:
+    Description: Store as the AWS_DEPLOY_ROLE_ARN secret in both GitHub repos
+    Value: !GetAtt DeployRole.Arn
